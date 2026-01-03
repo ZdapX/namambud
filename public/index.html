@@ -3,148 +3,111 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Image Generator</title>
+    <title>AI Generator V2</title>
     <style>
-        :root {
-            --primary: #6366f1;
-            --bg: #0f172a;
-            --card: #1e293b;
-            --text: #f8fafc;
-        }
-
         body {
-            background-color: var(--bg);
-            color: var(--text);
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            min-height: 100vh;
-            margin: 0;
-            padding: 20px;
+            background-color: #0f172a; color: #f8fafc;
+            font-family: sans-serif; display: flex; flex-direction: column;
+            align-items: center; min-height: 100vh; margin: 0; padding: 20px;
         }
-
-        h1 { margin-bottom: 2rem; }
-
         .container {
-            width: 100%;
-            max-width: 600px;
-            background: var(--card);
-            padding: 2rem;
-            border-radius: 12px;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            width: 100%; max-width: 600px; background: #1e293b;
+            padding: 2rem; border-radius: 12px;
         }
-
-        .input-group {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 20px;
-        }
-
-        input {
-            flex: 1;
-            padding: 12px;
-            border-radius: 8px;
-            border: 1px solid #334155;
-            background: #334155;
-            color: white;
-            outline: none;
-        }
-
-        button {
-            padding: 12px 24px;
-            background: var(--primary);
-            color: white;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            font-weight: bold;
-            transition: 0.2s;
-        }
-
-        button:hover { opacity: 0.9; }
-        button:disabled { background: #475569; cursor: not-allowed; }
-
-        .gallery {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 10px;
-            margin-top: 20px;
-        }
-
-        .gallery img {
-            width: 100%;
-            border-radius: 8px;
-            transition: transform 0.2s;
-        }
-        
-        .gallery img:hover { transform: scale(1.02); }
-
-        .loader {
-            display: none;
-            text-align: center;
-            margin-top: 10px;
-            color: #94a3b8;
-        }
+        .input-group { display: flex; gap: 10px; margin-bottom: 20px; }
+        input { flex: 1; padding: 12px; border-radius: 8px; border: none; }
+        button { padding: 12px 24px; background: #6366f1; color: white; border: none; border-radius: 8px; cursor: pointer; }
+        button:disabled { background: #475569; }
+        .status { margin-top: 10px; color: #94a3b8; font-style: italic; }
+        .gallery { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-top: 20px; }
+        img { width: 100%; border-radius: 8px; }
     </style>
 </head>
 <body>
-
-    <h1>✨ AI Text to Image</h1>
-
+    <h1>🚀 AI Text to Image V2</h1>
     <div class="container">
         <div class="input-group">
-            <input type="text" id="promptInput" placeholder="Contoh: Cyberpunk city, neon lights..." />
-            <button id="generateBtn" onclick="generateImage()">Buat</button>
+            <input type="text" id="promptInput" placeholder="Contoh: A flying cat in space..." />
+            <button id="generateBtn" onclick="startGeneration()">Buat Gambar</button>
         </div>
-
-        <div class="loader" id="loader">Sedang membuat gambar... (bisa memakan waktu 10-20 detik)</div>
-
+        <div class="status" id="statusText">Siap membuat gambar.</div>
         <div class="gallery" id="gallery"></div>
     </div>
 
     <script>
-        async function generateImage() {
+        async function startGeneration() {
             const prompt = document.getElementById('promptInput').value;
             const btn = document.getElementById('generateBtn');
-            const loader = document.getElementById('loader');
+            const status = document.getElementById('statusText');
             const gallery = document.getElementById('gallery');
 
-            if (!prompt) return alert("Masukkan prompt dulu!");
+            if (!prompt) return alert("Isi prompt dulu!");
 
-            // Reset UI
             btn.disabled = true;
-            btn.innerText = "Processing...";
-            loader.style.display = "block";
             gallery.innerHTML = "";
+            status.innerText = "⏳ Sedang menghubungi server...";
 
             try {
-                // Panggil Backend kita sendiri
-                const response = await fetch('/api/generate', {
+                // 1. Request Start
+                const startRes = await fetch('/api/start', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ prompt: prompt })
+                    body: JSON.stringify({ prompt })
                 });
+                const startData = await startRes.json();
 
-                const data = await response.json();
+                if (!startData.success) throw new Error(startData.error);
 
-                if (data.success && data.images) {
-                    data.images.forEach(imgUrl => {
-                        const img = document.createElement('img');
-                        img.src = imgUrl;
-                        gallery.appendChild(img);
-                    });
-                } else {
-                    alert('Gagal: ' + (data.error || "Unknown error"));
-                }
+                const { taskId, session } = startData;
+                status.innerText = "🔨 AI sedang bekerja... (0s)";
+
+                // 2. Polling Status (Looping di Client)
+                let attempts = 0;
+                const interval = setInterval(async () => {
+                    attempts++;
+                    status.innerText = `🔨 AI sedang bekerja... (${attempts * 2}s)`;
+
+                    try {
+                        const checkRes = await fetch('/api/check', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ taskId, session })
+                        });
+                        const checkData = await checkRes.json();
+
+                        if (checkData.state === 'completed') {
+                            clearInterval(interval);
+                            status.innerText = "✅ Selesai!";
+                            btn.disabled = false;
+                            
+                            checkData.images.forEach(url => {
+                                const img = document.createElement('img');
+                                img.src = url;
+                                gallery.appendChild(img);
+                            });
+                        } else if (checkData.state === 'failed') {
+                            clearInterval(interval);
+                            status.innerText = "❌ Gagal membuat gambar.";
+                            btn.disabled = false;
+                        }
+                        
+                        // Stop jika lebih dari 60 detik
+                        if (attempts > 30) {
+                            clearInterval(interval);
+                            status.innerText = "⚠️ Timeout: Terlalu lama.";
+                            btn.disabled = false;
+                        }
+
+                    } catch (e) {
+                        console.error(e);
+                        // Jangan stop interval kalau error koneksi sesaat
+                    }
+                }, 2000); // Cek setiap 2 detik
 
             } catch (err) {
                 console.error(err);
-                alert('Terjadi kesalahan saat menghubungi server.');
-            } finally {
+                status.innerText = "❌ Error: " + err.message;
                 btn.disabled = false;
-                btn.innerText = "Buat";
-                loader.style.display = "none";
             }
         }
     </script>
