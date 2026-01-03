@@ -1,54 +1,281 @@
 <!DOCTYPE html>
-<html lang="id">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Generator V2</title>
+    <title>AI Image Generator</title>
     <style>
+        :root {
+            --bg-color: #09090b;       /* Sangat gelap, hampir hitam */
+            --card-color: #18181b;     /* Abu-abu gelap */
+            --border-color: #27272a;   /* Border halus */
+            --accent-color: #2563eb;   /* Biru Solid */
+            --text-main: #f4f4f5;      /* Putih */
+            --text-muted: #a1a1aa;     /* Abu-abu teks */
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
         body {
-            background-color: #0f172a; color: #f8fafc;
-            font-family: sans-serif; display: flex; flex-direction: column;
-            align-items: center; min-height: 100vh; margin: 0; padding: 20px;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            padding: 40px 20px;
         }
-        .container {
-            width: 100%; max-width: 600px; background: #1e293b;
-            padding: 2rem; border-radius: 12px;
+
+        .main-container {
+            width: 100%;
+            max-width: 700px;
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
         }
-        .input-group { display: flex; gap: 10px; margin-bottom: 20px; }
-        input { flex: 1; padding: 12px; border-radius: 8px; border: none; }
-        button { padding: 12px 24px; background: #6366f1; color: white; border: none; border-radius: 8px; cursor: pointer; }
-        button:disabled { background: #475569; }
-        .status { margin-top: 10px; color: #94a3b8; font-style: italic; }
-        .gallery { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-top: 20px; }
-        img { width: 100%; border-radius: 8px; }
+
+        /* Header */
+        .header { text-align: center; margin-bottom: 20px; }
+        .header h1 { font-size: 2rem; font-weight: 700; letter-spacing: -0.05em; margin-bottom: 8px; }
+        .header p { color: var(--text-muted); font-size: 0.95rem; }
+
+        /* Input Area */
+        .input-wrapper {
+            background: var(--card-color);
+            border: 1px solid var(--border-color);
+            padding: 8px;
+            border-radius: 12px;
+            display: flex;
+            gap: 10px;
+            transition: border-color 0.2s;
+        }
+        
+        .input-wrapper:focus-within { border-color: var(--accent-color); }
+
+        input {
+            flex: 1;
+            background: transparent;
+            border: none;
+            color: var(--text-main);
+            padding: 12px 16px;
+            font-size: 1rem;
+            outline: none;
+        }
+
+        button.btn-generate {
+            background-color: var(--accent-color);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: opacity 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        button.btn-generate:hover { opacity: 0.9; }
+        button.btn-generate:disabled { background-color: var(--border-color); color: var(--text-muted); cursor: not-allowed; }
+
+        /* Progress Bar Area */
+        .progress-container {
+            display: none; /* Hidden by default */
+            background: var(--card-color);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .progress-labels {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+            font-size: 0.9rem;
+            color: var(--text-muted);
+        }
+
+        .progress-bar-bg {
+            width: 100%;
+            height: 8px;
+            background-color: var(--border-color);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .progress-bar-fill {
+            height: 100%;
+            width: 0%;
+            background-color: var(--accent-color);
+            transition: width 0.4s ease-out;
+            border-radius: 4px;
+        }
+
+        /* Gallery Grid */
+        .gallery {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 16px;
+            width: 100%;
+        }
+
+        .image-card {
+            background: var(--card-color);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            overflow: hidden;
+            position: relative;
+            animation: fadeIn 0.5s ease;
+        }
+
+        .image-card img {
+            width: 100%;
+            height: auto;
+            display: block;
+            transition: transform 0.3s;
+        }
+
+        /* Download Button Overlay */
+        .image-actions {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: rgba(0,0,0,0.8);
+            padding: 12px;
+            display: flex;
+            justify-content: center;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+
+        .image-card:hover .image-actions { opacity: 1; }
+
+        .btn-download {
+            background: white;
+            color: black;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .btn-download:hover { background: #e4e4e7; }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* SVG Icons Styling */
+        svg { width: 18px; height: 18px; }
+
     </style>
 </head>
 <body>
-    <h1>🚀 AI Text to Image V2</h1>
-    <div class="container">
-        <div class="input-group">
-            <input type="text" id="promptInput" placeholder="Contoh: A flying cat in space..." />
-            <button id="generateBtn" onclick="startGeneration()">Buat Gambar</button>
+
+    <div class="main-container">
+        
+        <div class="header">
+            <h1>Text to Image AI</h1>
+            <p>Generate high-quality images with simple text prompts.</p>
         </div>
-        <div class="status" id="statusText">Siap membuat gambar.</div>
+
+        <!-- Input Section -->
+        <div class="input-wrapper">
+            <input type="text" id="promptInput" placeholder="Describe your imagination here..." autocomplete="off">
+            <button class="btn-generate" id="generateBtn" onclick="startGeneration()">
+                <!-- Icon Arrow Right -->
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+                Generate
+            </button>
+        </div>
+
+        <!-- Progress Section -->
+        <div class="progress-container" id="progressContainer">
+            <div class="progress-labels">
+                <span id="statusText">Initializing...</span>
+                <span id="percentageText">0%</span>
+            </div>
+            <div class="progress-bar-bg">
+                <div class="progress-bar-fill" id="progressBar"></div>
+            </div>
+        </div>
+
+        <!-- Result Gallery -->
         <div class="gallery" id="gallery"></div>
+
     </div>
 
     <script>
+        // Variabel global untuk animasi
+        let progressInterval;
+        let currentProgress = 0;
+
+        function updateProgress(value, text) {
+            const bar = document.getElementById('progressBar');
+            const pct = document.getElementById('percentageText');
+            const status = document.getElementById('statusText');
+
+            currentProgress = value;
+            bar.style.width = value + '%';
+            pct.innerText = Math.floor(value) + '%';
+            if(text) status.innerText = text;
+        }
+
+        // Simulasi Loading 0 - 90%
+        function startSimulatedProgress() {
+            currentProgress = 0;
+            updateProgress(0, "Connecting to server...");
+            
+            clearInterval(progressInterval);
+            progressInterval = setInterval(() => {
+                // Logika: Cepat di awal, melambat saat mendekati 90%
+                if (currentProgress < 30) {
+                    currentProgress += 2;
+                } else if (currentProgress < 60) {
+                    currentProgress += 1; // lebih lambat
+                    updateProgress(currentProgress, "Generating details...");
+                } else if (currentProgress < 85) {
+                    currentProgress += 0.5; // sangat lambat
+                    updateProgress(currentProgress, "Finalizing render...");
+                } else if (currentProgress < 92) {
+                    currentProgress += 0.2; // mentok
+                }
+                
+                updateProgress(currentProgress);
+            }, 200);
+        }
+
         async function startGeneration() {
             const prompt = document.getElementById('promptInput').value;
             const btn = document.getElementById('generateBtn');
-            const status = document.getElementById('statusText');
             const gallery = document.getElementById('gallery');
+            const progressContainer = document.getElementById('progressContainer');
 
-            if (!prompt) return alert("Isi prompt dulu!");
+            if (!prompt) return;
 
+            // Reset UI
             btn.disabled = true;
             gallery.innerHTML = "";
-            status.innerText = "⏳ Sedang menghubungi server...";
+            progressContainer.style.display = "block";
+            
+            // Mulai animasi loading
+            startSimulatedProgress();
 
             try {
-                // 1. Request Start
+                // 1. Start Request
                 const startRes = await fetch('/api/start', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -59,14 +286,11 @@
                 if (!startData.success) throw new Error(startData.error);
 
                 const { taskId, session } = startData;
-                status.innerText = "🔨 AI sedang bekerja... (0s)";
 
-                // 2. Polling Status (Looping di Client)
+                // 2. Polling Status
                 let attempts = 0;
-                const interval = setInterval(async () => {
+                const poll = setInterval(async () => {
                     attempts++;
-                    status.innerText = `🔨 AI sedang bekerja... (${attempts * 2}s)`;
-
                     try {
                         const checkRes = await fetch('/api/check', {
                             method: 'POST',
@@ -76,39 +300,63 @@
                         const checkData = await checkRes.json();
 
                         if (checkData.state === 'completed') {
-                            clearInterval(interval);
-                            status.innerText = "✅ Selesai!";
-                            btn.disabled = false;
+                            clearInterval(poll);
+                            clearInterval(progressInterval); // Stop animasi simulasi
                             
-                            checkData.images.forEach(url => {
-                                const img = document.createElement('img');
-                                img.src = url;
-                                gallery.appendChild(img);
-                            });
+                            // Langsung set 100%
+                            updateProgress(100, "Completed");
+                            
+                            setTimeout(() => {
+                                renderImages(checkData.images);
+                                btn.disabled = false;
+                                progressContainer.style.display = "none";
+                            }, 800); // Delay dikit biar user liat 100%
+
                         } else if (checkData.state === 'failed') {
-                            clearInterval(interval);
-                            status.innerText = "❌ Gagal membuat gambar.";
-                            btn.disabled = false;
+                            throw new Error("Generation Failed");
                         }
                         
-                        // Stop jika lebih dari 60 detik
-                        if (attempts > 30) {
-                            clearInterval(interval);
-                            status.innerText = "⚠️ Timeout: Terlalu lama.";
-                            btn.disabled = false;
-                        }
+                        if (attempts > 40) throw new Error("Timeout");
 
                     } catch (e) {
-                        console.error(e);
-                        // Jangan stop interval kalau error koneksi sesaat
+                        clearInterval(poll);
+                        clearInterval(progressInterval);
+                        alert("Error: " + e.message);
+                        btn.disabled = false;
+                        progressContainer.style.display = "none";
                     }
-                }, 2000); // Cek setiap 2 detik
+                }, 2500);
 
             } catch (err) {
-                console.error(err);
-                status.innerText = "❌ Error: " + err.message;
+                clearInterval(progressInterval);
+                alert("Connection Error");
                 btn.disabled = false;
+                progressContainer.style.display = "none";
             }
+        }
+
+        function renderImages(images) {
+            const gallery = document.getElementById('gallery');
+            
+            images.forEach(url => {
+                const card = document.createElement('div');
+                card.className = 'image-card';
+
+                // Gunakan URL langsung untuk display
+                // Untuk download, kita buka tab baru agar aman dari CORS
+                card.innerHTML = `
+                    <img src="${url}" alt="Generated Image" loading="lazy">
+                    <div class="image-actions">
+                        <a href="${url}" target="_blank" class="btn-download">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                            </svg>
+                            Download
+                        </a>
+                    </div>
+                `;
+                gallery.appendChild(card);
+            });
         }
     </script>
 </body>
