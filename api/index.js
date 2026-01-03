@@ -12,7 +12,7 @@ app.use(express.json());
 
 const BASE = "https://tinywow.com";
 
-// Setup HTTP Agent biar tidak dianggap bot & koneksi stabil
+// Setup Agent: Meniru browser modern
 const agent = new https.Agent({
   keepAlive: true,
   maxSockets: 100,
@@ -21,7 +21,7 @@ const agent = new https.Agent({
   rejectUnauthorized: false
 });
 
-// Helper untuk membuat axios client dengan header dinamis
+// Helper Axios
 const createClient = (session = null) => {
   const headers = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
@@ -53,7 +53,7 @@ async function initSession() {
 
   const cookies = res.headers["set-cookie"] || [];
   const cookieStr = cookies.map(v => v.split(";")[0]).join("; ");
-
+  
   const xsrfCookie = cookies.find(v => v.startsWith("XSRF-TOKEN="));
   const xsrf = xsrfCookie ? decodeURIComponent(xsrfCookie.split("=")[1].split(";")[0]) : "";
 
@@ -78,53 +78,31 @@ async function progress(taskId, session) {
   return res.data;
 }
 
-// --- ENDPOINT 1: MULAI GENERATE ---
+// Routes
+app.get("/", (req, res) => res.send("AI Service Online"));
+
 app.post("/api/start", async (req, res) => {
   const { prompt } = req.body;
   if (!prompt) return res.status(400).json({ error: "Prompt required" });
 
   try {
-    // 1. Ambil sesi baru
     const session = await initSession();
-    if (!session.xsrf) throw new Error("Gagal mengambil session TinyWow");
-
-    // 2. Kirim perintah generate
+    if (!session.xsrf) throw new Error("Session Failed");
     const taskId = await prepare(prompt, session);
-
-    // 3. Kembalikan Session & Task ID ke Frontend (supaya frontend yang nunggu)
-    res.json({
-      success: true,
-      taskId: taskId,
-      session: session // Kita butuh session ini untuk ngecek status nanti
-    });
-
+    res.json({ success: true, taskId, session });
   } catch (error) {
-    console.error("Start Error:", error.message);
     res.status(500).json({ error: error.message });
   }
 });
 
-// --- ENDPOINT 2: CEK STATUS ---
 app.post("/api/check", async (req, res) => {
   const { taskId, session } = req.body;
-  if (!taskId || !session) return res.status(400).json({ error: "Missing data" });
-
   try {
     const result = await progress(taskId, session);
-    
-    // Kirim status apa adanya ke frontend
-    res.json({
-      success: true,
-      state: result.state, // 'processing', 'completed', atau 'failed'
-      images: result.images || []
-    });
-
+    res.json({ success: true, state: result.state, images: result.images || [] });
   } catch (error) {
-    console.error("Check Error:", error.message);
     res.status(500).json({ error: error.message });
   }
 });
-
-app.get("/", (req, res) => res.send("AI Backend v2 (Polling Mode)"));
 
 module.exports = app;
